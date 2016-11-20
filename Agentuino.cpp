@@ -421,7 +421,11 @@ SNMP_API_STAT_CODES AgentuinoClass::responsePdu(SNMP_PDU *pdu)
 		_packet[_packetPos++] = pdu->VALUE.data[i];
 	}
 	//
-	ether.sendUdp(_packet, _packetSize, _srcPort, _dstIp, _dstPort);
+  //ether.makeUdpReply(_packet, _packetSize, _srcPort);
+	ether.makeUdpReplyStart(_srcPort);
+	ether.makeUdpReplyData(_packet, _packetSize);
+	ether.makeUdpReplyFinish();
+	//ether.sendUdp(_packet, _packetSize, _srcPort, _dstIp, _dstPort);
 	//Udp.beginPacket(Udp.remoteIP(), Udp.remotePort());
 	//Udp.write(_packet, _packetSize);
 	//Udp.endPacket();
