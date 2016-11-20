@@ -33,7 +33,9 @@
 //Frees a pointer only if it is !NULL and sets its value to NULL. 
 
 #include "Arduino.h"
-#include "Udp.h"
+#include <EtherCard.h>
+
+//#include "Udp.h"
 
 extern "C" {
 	// callback function
@@ -327,6 +329,22 @@ typedef struct SNMP_VALUE {
 		}
 	}
 	//
+	// decode's an int syntax to int8
+	SNMP_ERR_CODES decode(int8_t *value) {
+		if ( syntax == SNMP_SYNTAX_INT ) {
+			uint8_t *p = (uint8_t*)value, i;
+			memset(value, 0, sizeof(*value));
+			for(i = 0;i < size;i++)
+			{
+				*p++ = data[size - 1 - i];
+			}
+			return SNMP_ERR_NO_ERROR;
+		} else {
+			clear();
+			return SNMP_ERR_WRONG_TYPE;
+		}
+	}
+	//
 	// decode's an int syntax to int16
 	SNMP_ERR_CODES decode(int16_t *value) {
 		if ( syntax == SNMP_SYNTAX_INT ) {
@@ -423,6 +441,20 @@ typedef struct SNMP_VALUE {
 				clear();	
 				return SNMP_ERR_TOO_BIG;
 			}
+		} else {
+			clear();
+			return SNMP_ERR_WRONG_TYPE;
+		}
+	}
+	//
+	// encode's an int8 to int, opaque  syntax
+	SNMP_ERR_CODES encode(SNMP_SYNTAXES syn, const int8_t value) {
+		memset(data, 0, SNMP_MAX_VALUE_LEN);
+		if ( syn == SNMP_SYNTAX_INT || syn == SNMP_SYNTAX_OPAQUE ) {
+			size = 1;
+			syntax = syn;
+			data[0] = value;
+			return SNMP_ERR_NO_ERROR;
 		} else {
 			clear();
 			return SNMP_ERR_WRONG_TYPE;
@@ -575,6 +607,7 @@ public:
 	SNMP_API_STAT_CODES begin();
 	SNMP_API_STAT_CODES begin(char *getCommName, char *setCommName, uint16_t port);
 	void listen(void);
+	void parsePacket(uint16_t dest_port, uint8_t src_ip[IP_LEN], uint16_t src_port, const char *data, uint16_t len);
 	SNMP_API_STAT_CODES requestPdu(SNMP_PDU *pdu);
 	SNMP_API_STAT_CODES responsePdu(SNMP_PDU *pdu);
 	void onPduReceive(onPduReceiveCallback pduReceived);
@@ -589,11 +622,14 @@ private:
 	SNMP_PDU_TYPES _dstType;
 	uint8_t _dstIp[4];
 	uint16_t _dstPort;
+	uint16_t _srcPort;
 	char *_getCommName;
 	size_t _getSize;
 	char *_setCommName;
 	size_t _setSize;
 	onPduReceiveCallback _callback;
+	SNMP_API_STAT_CODES _apiError;
+	bool _packetAvailable;
 };
 
 extern AgentuinoClass Agentuino;

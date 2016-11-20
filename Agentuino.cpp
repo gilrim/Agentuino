@@ -23,9 +23,9 @@
 //
 
 #include "Agentuino.h"
-#include "EthernetUdp.h"
+#include "EtherCard.h"
 
-EthernetUDP Udp;
+//EthernetUDP Udp;
 SNMP_API_STAT_CODES AgentuinoClass::begin()
 {
 	// set community names
@@ -37,7 +37,10 @@ SNMP_API_STAT_CODES AgentuinoClass::begin()
 	_getSize = strlen(_getCommName);
 	//
 	// init UDP socket
-	Udp.begin(SNMP_DEFAULT_PORT);
+	//Udp.begin(SNMP_DEFAULT_PORT);
+  //register udpSerialPrint() to port 1337
+  //ether.udpServerListenOnPort(&udpSerialPrint, SNMP_DEFAULT_PORT);
+  _srcPort = SNMP_DEFAULT_PORT;
 	//
 	return SNMP_API_STAT_SUCCESS;
 }
@@ -59,10 +62,13 @@ SNMP_API_STAT_CODES AgentuinoClass::begin(char *getCommName, char *setCommName, 
 	//
 	// validate session port number
 	if ( port == NULL || port == 0 ) port = SNMP_DEFAULT_PORT;
-	//
+	_srcPort = port;
+  //
 	// init UDP socket
-	Udp.begin(port);
-
+	//Udp.begin(port);
+  //register udpSerialPrint() to port 1337
+  //ether.udpServerListenOnPort(&udpSerialPrint, SNMP_DEFAULT_PORT);
+  
 	return SNMP_API_STAT_SUCCESS;
 }
 
@@ -71,10 +77,58 @@ void AgentuinoClass::listen(void)
 	// if bytes are available in receive buffer
 	// and pointer to a function (delegate function)
 	// isn't null, trigger the function
-	Udp.parsePacket();
-	if ( Udp.available() && _callback != NULL ) (*_callback)();
+	ether.packetLoop(ether.packetReceive());
+  //Udp.parsePacket();
+	if ( _packetAvailable && _callback != NULL ) (*_callback)();
 }
 
+void AgentuinoClass::parsePacket(uint16_t dest_port, uint8_t src_ip[IP_LEN], uint16_t src_port, const char *data, uint16_t len){
+  _packetAvailable = true;
+  memcpy(_dstIp, src_ip, 4);
+	_dstPort = src_port;
+  _srcPort = dest_port;
+	
+  _packetSize = len;
+	// reset packet array
+	memset(_packet, 0, SNMP_MAX_PACKET_LEN);
+	// validate packet
+	if ( _packetSize != 0 && _packetSize > SNMP_MAX_PACKET_LEN ) {
+		_apiError = SNMP_API_STAT_PACKET_TOO_BIG;
+    return;
+	}
+	//
+	// get UDP packet
+  memcpy(_packet, data, _packetSize);
+	//Udp.parsePacket();
+	//Udp.read(_packet, _packetSize);
+// 	Udp.readPacket(_packet, _packetSize, _dstIp, &_dstPort);
+	//
+	// packet check 1
+	if ( _packet[0] != 0x30 ) {
+		//
+		//SNMP_FREE(_packet);
+
+		_apiError = SNMP_API_STAT_PACKET_INVALID;
+    return;
+	}
+
+  /*Serial.println("packet!");
+  Serial.print("dest_port: ");
+  Serial.println(dest_port);
+  Serial.print("src_port: ");
+  Serial.println(src_port);
+  
+  
+  Serial.print("src_ip: ");
+  ether.printIp(src_ip);
+  Serial.println();
+  Serial.print("len: ");
+  Serial.println(len);
+  Serial.println("data: ");
+  Serial.println(data);*/
+  //while(1);
+  _apiError = SNMP_API_STAT_SUCCESS;
+}
 
 SNMP_API_STAT_CODES AgentuinoClass::requestPdu(SNMP_PDU *pdu)
 {
@@ -95,33 +149,39 @@ SNMP_API_STAT_CODES AgentuinoClass::requestPdu(SNMP_PDU *pdu)
 	byte obiLen, obiEnd;
 	byte valTyp, valLen, valEnd;
 	byte i;
+
+	_packetAvailable = false;
+
+ 	if (_apiError != SNMP_API_STAT_SUCCESS) {
+		return _apiError;
+	}
 	//
 	// set packet packet size (skip UDP header)
-	_packetSize = Udp.available();
+	//_packetSize = Udp.available();
 	//
 	// reset packet array
-	memset(_packet, 0, SNMP_MAX_PACKET_LEN);
+	//memset(_packet, 0, SNMP_MAX_PACKET_LEN);
 	//
 	// validate packet
-	if ( _packetSize != 0 && _packetSize > SNMP_MAX_PACKET_LEN ) {
+	//if ( _packetSize != 0 && _packetSize > SNMP_MAX_PACKET_LEN ) {
 		//
 		//SNMP_FREE(_packet);
 
-		return SNMP_API_STAT_PACKET_TOO_BIG;
-	}
+	//	return SNMP_API_STAT_PACKET_TOO_BIG;
+	//}
 	//
 	// get UDP packet
 	//Udp.parsePacket();
-	Udp.read(_packet, _packetSize);
-// 	Udp.readPacket(_packet, _packetSize, _dstIp, &_dstPort);
+	//Udp.read(_packet, _packetSize);
+	//Udp.readPacket(_packet, _packetSize, _dstIp, &_dstPort);
 	//
 	// packet check 1
-	if ( _packet[0] != 0x30 ) {
+	//if ( _packet[0] != 0x30 ) {
 		//
 		//SNMP_FREE(_packet);
 
-		return SNMP_API_STAT_PACKET_INVALID;
-	}
+		//return SNMP_API_STAT_PACKET_INVALID;
+	//}
 	//
 	// sequence length
 	seqLen = _packet[1];
@@ -361,9 +421,10 @@ SNMP_API_STAT_CODES AgentuinoClass::responsePdu(SNMP_PDU *pdu)
 		_packet[_packetPos++] = pdu->VALUE.data[i];
 	}
 	//
-	Udp.beginPacket(Udp.remoteIP(), Udp.remotePort());
-	Udp.write(_packet, _packetSize);
-	Udp.endPacket();
+	ether.sendUdp(_packet, _packetSize, _srcPort, _dstIp, _dstPort);
+	//Udp.beginPacket(Udp.remoteIP(), Udp.remotePort());
+	//Udp.write(_packet, _packetSize);
+	//Udp.endPacket();
 //	Udp.write(_packet, _packetSize, _dstIp, _dstPort);
 	//
 	return SNMP_API_STAT_SUCCESS;
