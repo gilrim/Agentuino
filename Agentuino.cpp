@@ -332,105 +332,89 @@ SNMP_API_STAT_CODES AgentuinoClass::requestPdu(SNMP_PDU *pdu)
 SNMP_API_STAT_CODES AgentuinoClass::responsePdu(SNMP_PDU *pdu)
 {
 	int32_u u;
-	byte i;
-	//
-	// Length of entire SNMP packet
-	_packetPos = 0;  // 23
+	
+  ether.makeUdpReplyStart(_srcPort);
+	
+  // Length of entire SNMP packet
 	_packetSize = 25 + sizeof(pdu->requestId) + sizeof(pdu->error) + sizeof(pdu->errorIndex) + pdu->OID.size + pdu->VALUE.size;
-	//
-	memset(_packet, 0, SNMP_MAX_PACKET_LEN);
-	//
+
+  memset(_packet, 0, SNMP_MAX_PACKET_LEN);
+
 	if ( _dstType == SNMP_PDU_SET ) {
 		_packetSize += _setSize;
 	} else {
 		_packetSize += _getSize;
 	}
-	//
-	_packet[_packetPos++] = (byte)SNMP_SYNTAX_SEQUENCE;	// type
-	_packet[_packetPos++] = (byte)_packetSize - 2;		// length
-	//
+
+	ether.makeUdpReplyData(SNMP_SYNTAX_SEQUENCE);
+	ether.makeUdpReplyData(_packetSize - 2);
+
 	// SNMP version
-	_packet[_packetPos++] = (byte)SNMP_SYNTAX_INT;	// type
-	_packet[_packetPos++] = 0x01;			// length
-	_packet[_packetPos++] = 0x00;			// value
-	//
+	ether.makeUdpReplyData(SNMP_SYNTAX_INT);
+	ether.makeUdpReplyData(0x01);
+	ether.makeUdpReplyData(0x00);
+
 	// SNMP community string
-	_packet[_packetPos++] = (byte)SNMP_SYNTAX_OCTETS;	// type
+	ether.makeUdpReplyData(SNMP_SYNTAX_OCTETS);
 	if ( _dstType == SNMP_PDU_SET ) {
-		_packet[_packetPos++] = (byte)_setSize;	// length
-		for ( i = 0; i < _setSize; i++ ) {
-			_packet[_packetPos++] = (byte)_setCommName[i];
-		}
+		ether.makeUdpReplyData(_setSize);
+	  ether.makeUdpReplyData(_setCommName, _setSize);
 	} else {
-		_packet[_packetPos++] = (byte)_getSize;	// length
-		for ( i = 0; i < _getSize; i++ ) {
-			_packet[_packetPos++] = (byte)_getCommName[i];
-		}
+		ether.makeUdpReplyData(_getSize);
+	  ether.makeUdpReplyData(_getCommName, _getSize);
 	}
-	//
+
 	// SNMP PDU
-	_packet[_packetPos++] = (byte)pdu->type;
-	_packet[_packetPos++] = (byte)( sizeof(pdu->requestId) + sizeof((int32_t)pdu->error) + sizeof(pdu->errorIndex) + pdu->OID.size + pdu->VALUE.size + 14 );
-	//
+	ether.makeUdpReplyData(pdu->type);
+	ether.makeUdpReplyData(sizeof(pdu->requestId) + sizeof((int32_t)pdu->error) + sizeof(pdu->errorIndex) + pdu->OID.size + pdu->VALUE.size + 14);
+
 	// Request ID (size always 4 e.g. 4-byte int)
-	_packet[_packetPos++] = (byte)SNMP_SYNTAX_INT;	// type
-	_packet[_packetPos++] = (byte)sizeof(pdu->requestId);
+	ether.makeUdpReplyData(SNMP_SYNTAX_INT);
+	ether.makeUdpReplyData(sizeof(pdu->requestId));
 	u.int32 = pdu->requestId;
-	_packet[_packetPos++] = u.data[3];
-	_packet[_packetPos++] = u.data[2];
-	_packet[_packetPos++] = u.data[1];
-	_packet[_packetPos++] = u.data[0];
-	//
+	ether.makeUdpReplyData(u.data[3]);
+	ether.makeUdpReplyData(u.data[2]);
+	ether.makeUdpReplyData(u.data[1]);
+  ether.makeUdpReplyData(u.data[0]);
+
 	// Error (size always 4 e.g. 4-byte int)
-	_packet[_packetPos++] = (byte)SNMP_SYNTAX_INT;	// type
-	_packet[_packetPos++] = (byte)sizeof((int32_t)pdu->error);
+	ether.makeUdpReplyData(SNMP_SYNTAX_INT);
+	ether.makeUdpReplyData(sizeof((int32_t)pdu->error));
 	u.int32 = pdu->error;
-	_packet[_packetPos++] = u.data[3];
-	_packet[_packetPos++] = u.data[2];
-	_packet[_packetPos++] = u.data[1];
-	_packet[_packetPos++] = u.data[0];
-	//
+	ether.makeUdpReplyData(u.data[3]);
+	ether.makeUdpReplyData(u.data[2]);
+	ether.makeUdpReplyData(u.data[1]);
+  ether.makeUdpReplyData(u.data[0]);
+
 	// Error Index (size always 4 e.g. 4-byte int)
-	_packet[_packetPos++] = (byte)SNMP_SYNTAX_INT;	// type
-	_packet[_packetPos++] = (byte)sizeof(pdu->errorIndex);
+	ether.makeUdpReplyData(SNMP_SYNTAX_INT);
+	ether.makeUdpReplyData(sizeof(pdu->errorIndex));
 	u.int32 = pdu->errorIndex;
-	_packet[_packetPos++] = u.data[3];
-	_packet[_packetPos++] = u.data[2];
-	_packet[_packetPos++] = u.data[1];
-	_packet[_packetPos++] = u.data[0];
-	//
+	ether.makeUdpReplyData(u.data[3]);
+	ether.makeUdpReplyData(u.data[2]);
+	ether.makeUdpReplyData(u.data[1]);
+  ether.makeUdpReplyData(u.data[0]);
+
 	// Varbind List
-	_packet[_packetPos++] = (byte)SNMP_SYNTAX_SEQUENCE;	// type
-	_packet[_packetPos++] = (byte)( pdu->OID.size + pdu->VALUE.size + 6 ); //4
-	//
+	ether.makeUdpReplyData(SNMP_SYNTAX_SEQUENCE);
+	ether.makeUdpReplyData(pdu->OID.size + pdu->VALUE.size + 6);
+
 	// Varbind
-	_packet[_packetPos++] = (byte)SNMP_SYNTAX_SEQUENCE;	// type
-	_packet[_packetPos++] = (byte)( pdu->OID.size + pdu->VALUE.size + 4 ); //2
-	//
+	ether.makeUdpReplyData(SNMP_SYNTAX_SEQUENCE);
+	ether.makeUdpReplyData(pdu->OID.size + pdu->VALUE.size + 4);
+
 	// ObjectIdentifier
-	_packet[_packetPos++] = (byte)SNMP_SYNTAX_OID;	// type
-	_packet[_packetPos++] = (byte)(pdu->OID.size);
-	for ( i = 0; i < pdu->OID.size; i++ ) {
-		_packet[_packetPos++] = pdu->OID.data[i];
-	}
-	//
+	ether.makeUdpReplyData(SNMP_SYNTAX_OID);
+	ether.makeUdpReplyData(pdu->OID.size);
+	ether.makeUdpReplyData(pdu->OID.data, pdu->OID.size);
+
 	// Value
-	_packet[_packetPos++] = (byte)pdu->VALUE.syntax;	// type
-	_packet[_packetPos++] = (byte)(pdu->VALUE.size);
-	for ( i = 0; i < pdu->VALUE.size; i++ ) {
-		_packet[_packetPos++] = pdu->VALUE.data[i];
-	}
-	//
-  //ether.makeUdpReply(_packet, _packetSize, _srcPort);
-	ether.makeUdpReplyStart(_srcPort);
-	ether.makeUdpReplyData(_packet, _packetSize);
+	ether.makeUdpReplyData(pdu->VALUE.syntax);
+	ether.makeUdpReplyData(pdu->VALUE.size);
+	ether.makeUdpReplyData(pdu->VALUE.data, pdu->VALUE.size);
+
 	ether.makeUdpReplyFinish();
-	//ether.sendUdp(_packet, _packetSize, _srcPort, _dstIp, _dstPort);
-	//Udp.beginPacket(Udp.remoteIP(), Udp.remotePort());
-	//Udp.write(_packet, _packetSize);
-	//Udp.endPacket();
-//	Udp.write(_packet, _packetSize, _dstIp, _dstPort);
-	//
+
 	return SNMP_API_STAT_SUCCESS;
 }
 

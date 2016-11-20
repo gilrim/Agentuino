@@ -618,7 +618,6 @@ public:
 private:
 	byte _packet[SNMP_MAX_PACKET_LEN];
 	uint16_t _packetSize;
-	uint16_t _packetPos;
 	SNMP_PDU_TYPES _dstType;
 	uint8_t _dstIp[4];
 	uint16_t _dstPort;
