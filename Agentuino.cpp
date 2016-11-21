@@ -31,17 +31,17 @@ SNMP_API_STAT_CODES AgentuinoClass::begin()
 	// set community names
 	_getCommName = "public";
 	_setCommName = "private";
-	//
+
 	// set community name set/get sizes
 	_setSize = strlen(_setCommName);
 	_getSize = strlen(_getCommName);
-	//
+
 	// init UDP socket
 	//Udp.begin(SNMP_DEFAULT_PORT);
   //register udpSerialPrint() to port 1337
   //ether.udpServerListenOnPort(&udpSerialPrint, SNMP_DEFAULT_PORT);
   _srcPort = SNMP_DEFAULT_PORT;
-	//
+
 	return SNMP_API_STAT_SUCCESS;
 }
 
@@ -50,20 +50,20 @@ SNMP_API_STAT_CODES AgentuinoClass::begin(char *getCommName, char *setCommName, 
 	// set community name set/get sizes
 	_setSize = strlen(setCommName);
 	_getSize = strlen(getCommName);
-	//
+
 	// validate get/set community name sizes
 	if ( _setSize > SNMP_MAX_NAME_LEN + 1 || _getSize > SNMP_MAX_NAME_LEN + 1 ) {
 		return SNMP_API_STAT_NAME_TOO_BIG;
 	}
-	//
+
 	// set community names
 	_getCommName = getCommName;
 	_setCommName = setCommName;
-	//
+
 	// validate session port number
 	if ( port == NULL || port == 0 ) port = SNMP_DEFAULT_PORT;
 	_srcPort = port;
-  //
+
 	// init UDP socket
 	//Udp.begin(port);
   //register udpSerialPrint() to port 1337
@@ -96,37 +96,16 @@ void AgentuinoClass::parsePacket(uint16_t dest_port, uint8_t src_ip[IP_LEN], uin
 		_apiError = SNMP_API_STAT_PACKET_TOO_BIG;
     return;
 	}
-	//
+
 	// get UDP packet
   memcpy(_packet, data, _packetSize);
-	//Udp.parsePacket();
-	//Udp.read(_packet, _packetSize);
-// 	Udp.readPacket(_packet, _packetSize, _dstIp, &_dstPort);
-	//
+
 	// packet check 1
 	if ( _packet[0] != 0x30 ) {
-		//
-		//SNMP_FREE(_packet);
-
 		_apiError = SNMP_API_STAT_PACKET_INVALID;
     return;
 	}
 
-  /*Serial.println("packet!");
-  Serial.print("dest_port: ");
-  Serial.println(dest_port);
-  Serial.print("src_port: ");
-  Serial.println(src_port);
-  
-  
-  Serial.print("src_ip: ");
-  ether.printIp(src_ip);
-  Serial.println();
-  Serial.print("len: ");
-  Serial.println(len);
-  Serial.println("data: ");
-  Serial.println(data);*/
-  //while(1);
   _apiError = SNMP_API_STAT_SUCCESS;
 }
 
@@ -155,35 +134,8 @@ SNMP_API_STAT_CODES AgentuinoClass::requestPdu(SNMP_PDU *pdu)
  	if (_apiError != SNMP_API_STAT_SUCCESS) {
 		return _apiError;
 	}
-	//
-	// set packet packet size (skip UDP header)
-	//_packetSize = Udp.available();
-	//
-	// reset packet array
-	//memset(_packet, 0, SNMP_MAX_PACKET_LEN);
-	//
-	// validate packet
-	//if ( _packetSize != 0 && _packetSize > SNMP_MAX_PACKET_LEN ) {
-		//
-		//SNMP_FREE(_packet);
-
-	//	return SNMP_API_STAT_PACKET_TOO_BIG;
-	//}
-	//
-	// get UDP packet
-	//Udp.parsePacket();
-	//Udp.read(_packet, _packetSize);
-	//Udp.readPacket(_packet, _packetSize, _dstIp, &_dstPort);
-	//
-	// packet check 1
-	//if ( _packet[0] != 0x30 ) {
-		//
-		//SNMP_FREE(_packet);
-
-		//return SNMP_API_STAT_PACKET_INVALID;
-	//}
-	//
-	// sequence length
+	
+  // sequence length
 	seqLen = _packet[1];
 	// version
 	verLen = _packet[3];
@@ -209,73 +161,63 @@ SNMP_API_STAT_CODES AgentuinoClass::requestPdu(SNMP_PDU *pdu)
 	valTyp = _packet[obiEnd + 1];
 	valLen = _packet[obiEnd + 2];
 	valEnd = obiEnd + 2 + valLen;
-	//
+
 	// extract version
 	pdu->version = 0;
 	for ( i = 0; i < verLen; i++ ) {
 		pdu->version = (pdu->version << 8) | _packet[5 + i];
 	}
-	//
+
 	// validate version
-	//
+
 	// pdu-type
 	pdu->type = (SNMP_PDU_TYPES)pduTyp;
 	_dstType = pdu->type;
-	//
+
 	// validate community size
 	if ( comLen > SNMP_MAX_NAME_LEN ) {
 		// set pdu error
 		pdu->error = SNMP_ERR_TOO_BIG;
-		//
 		return SNMP_API_STAT_NAME_TOO_BIG;
 	}
-	//
-	//
+
 	// validate community name
 	if ( pdu->type == SNMP_PDU_SET && comLen == _setSize ) {
-		//
 		for ( i = 0; i < _setSize; i++ ) {
 			if( _packet[verEnd + 3 + i] != (byte)_setCommName[i] ) {
 				// set pdu error
 				pdu->error = SNMP_ERR_NO_SUCH_NAME;
-				//
 				return SNMP_API_STAT_NO_SUCH_NAME;
 			}
 		}
 	} else if ( pdu->type == SNMP_PDU_GET && comLen == _getSize ) {
-		//
 		for ( i = 0; i < _getSize; i++ ) {
 			if( _packet[verEnd + 3 + i] != (byte)_getCommName[i] ) {
 				// set pdu error
 				pdu->error = SNMP_ERR_NO_SUCH_NAME;
-				//
 				return SNMP_API_STAT_NO_SUCH_NAME;
 			}
 		}
 	} else if ( pdu->type == SNMP_PDU_GET_NEXT && comLen == _getSize ) {
-		//
 		for ( i = 0; i < _getSize; i++ ) {
 			if( _packet[verEnd + 3 + i] != (byte)_getCommName[i] ) {
 				// set pdu error
 				pdu->error = SNMP_ERR_NO_SUCH_NAME;
-				//
 				return SNMP_API_STAT_NO_SUCH_NAME;
 			}
 		}
 	} else {
 		// set pdu error
 		pdu->error = SNMP_ERR_NO_SUCH_NAME;
-		//
 		return SNMP_API_STAT_NO_SUCH_NAME;
 	}
-	//
-	//
+
 	// extract reqiest-id 0x00 0x00 0x00 0x01 (4-byte int aka int32)
 	pdu->requestId = 0;
 	for ( i = 0; i < ridLen; i++ ) {
 		pdu->requestId = (pdu->requestId << 8) | _packet[comEnd + 5 + i];
 	}
-	//
+
 	// extract error 
 	pdu->error = SNMP_ERR_NO_ERROR;
 	int32_t err = 0;
@@ -283,32 +225,30 @@ SNMP_API_STAT_CODES AgentuinoClass::requestPdu(SNMP_PDU *pdu)
 		err = (err << 8) | _packet[ridEnd + 3 + i];
 	}
 	pdu->error = (SNMP_ERR_CODES)err;
-	//
+
 	// extract error-index 
 	pdu->errorIndex = 0;
 	for ( i = 0; i < eriLen; i++ ) {
 		pdu->errorIndex = (pdu->errorIndex << 8) | _packet[errEnd + 3 + i];
 	}
-	//
-	//
+
 	// validate object-identifier size
 	if ( obiLen > SNMP_MAX_OID_LEN ) {
 		// set pdu error
 		pdu->error = SNMP_ERR_TOO_BIG;
-
 		return SNMP_API_STAT_OID_TOO_BIG;
 	}
-	//
+
 	// extract and contruct object-identifier
 	memset(pdu->OID.data, 0, SNMP_MAX_OID_LEN);
 	pdu->OID.size = obiLen;
 	for ( i = 0; i < obiLen; i++ ) {
 		pdu->OID.data[i] = _packet[eriEnd + 7 + i];
 	}
-	//
+
 	// value-type
 	pdu->VALUE.syntax = (SNMP_SYNTAXES)valTyp;
-	//
+
 	// validate value size
 	if ( obiLen > SNMP_MAX_VALUE_LEN ) {
 		// set pdu error
@@ -316,16 +256,16 @@ SNMP_API_STAT_CODES AgentuinoClass::requestPdu(SNMP_PDU *pdu)
 
 		return SNMP_API_STAT_VALUE_TOO_BIG;
 	}
-	//
+
 	// value-size
 	pdu->VALUE.size = valLen;
-	//
+
 	// extract value
 	memset(pdu->VALUE.data, 0, SNMP_MAX_VALUE_LEN);
 	for ( i = 0; i < valLen; i++ ) {
 		pdu->VALUE.data[i] = _packet[obiEnd + 3 + i];
 	}
-	//
+
 	return SNMP_API_STAT_SUCCESS;
 }
 
@@ -427,7 +367,7 @@ void AgentuinoClass::onPduReceive(onPduReceiveCallback pduReceived)
 
 void AgentuinoClass::freePdu(SNMP_PDU *pdu)
 {
-	//
+
 	memset(pdu->OID.data, 0, SNMP_MAX_OID_LEN);
 	memset(pdu->VALUE.data, 0, SNMP_MAX_VALUE_LEN);
 	free((char *) pdu);
